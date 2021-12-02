@@ -3130,6 +3130,41 @@ public:
 };
 } // namespace
 
+namespace {
+class ConvertLinalgInitTensorOp
+    : public OpConversionPattern<LinalgInitTensorOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(LinalgInitTensorOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (failed(verifyLinalgCompatibleTypes(op, rewriter)))
+      return failure();
+
+    Location loc = op.getLoc();
+    auto resultType =
+      getTypeConverter()->convertType(op.getType()).cast<RankedTensorType>();
+    Type resultElementType = resultType.getElementType();
+
+    SmallVector<Value> sizesValues, sizesIndexes;
+    if (!getListConstructElements(op.sizes(), sizesValues))
+      return rewriter.notifyMatchFailure(
+          op, "sizes argument must be created by ListConstruct");
+
+    auto sizesInts = getTypeConvertedValues(
+        rewriter, loc, getTypeConverter(), sizesValues);
+    for (auto sizeInt : sizesInts)
+      sizesIndexes.push_back(castIntToIndex(rewriter, loc, sizeInt));
+
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, sizesIndexes, resultElementType);
+
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(op, resultType, initTensor);
+    return success();
+  }
+};
+} // namespace
+
 // -----------------------------------------------------------------------------
 // The pass
 // -----------------------------------------------------------------------------
@@ -3223,6 +3258,8 @@ public:
     patterns.add<ConvertAtenDropoutOp>(typeConverter, context);
     target.addIllegalOp<AtenFill_ScalarOp>();
     patterns.add<ConvertAtenFill_ScalarOp>(typeConverter, context);
+    target.addIllegalOp<LinalgInitTensorOp>();
+    patterns.add<ConvertLinalgInitTensorOp>(typeConverter, context);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))

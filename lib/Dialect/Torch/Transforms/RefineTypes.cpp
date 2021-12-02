@@ -364,6 +364,8 @@ public:
       return visitScalarToTensorConversionOp<AtenTensorBoolOp>(tensorBool);
     } else if (auto tensor = dyn_cast<AtenTensorOp>(op)) {
       return visitAtenTensorOp(tensor);
+    } else if (auto initTensor = dyn_cast<LinalgInitTensorOp>(op)) {
+      return visitLinalgInitTensorOp(initTensor);
     } else if (auto zeros = dyn_cast<AtenZerosOp>(op)) {
       return visitConstantTensorAllocOp<AtenZerosOp>(zeros);
     } else if (auto ones = dyn_cast<AtenOnesOp>(op)) {
@@ -521,6 +523,7 @@ private:
   template <typename OpTy>
   ChangeResult visitScalarToTensorConversionOp(OpTy op);
   ChangeResult visitAtenTensorOp(AtenTensorOp op);
+  ChangeResult visitLinalgInitTensorOp(LinalgInitTensorOp op);
   template <typename OpTy> ChangeResult visitConstantTensorAllocOp(OpTy op);
   ChangeResult
   visitAtenToDtypeOp(AtenToDtypeOp op,
@@ -563,6 +566,10 @@ private:
   ChangeResult
   visitAtenMatmulOp(AtenMatmulOp op,
                     ArrayRef<LatticeElement<ValueKnowledge> *> operands);
+
+  ChangeResult
+  visitLinalgInitTensorOp(LinalgInitTensorOp op,
+                          ArrayRef<LatticeElement<ValueKnowledge> *> operands);
   
   template <typename OpTy>
   ChangeResult
@@ -1167,6 +1174,32 @@ ChangeResult TypeAnalyzer::visitAtenTensorOp(AtenTensorOp op) {
     knowledge.hasSizes = true;
     knowledge.sizes.resize(rank, kUnknownSize);
   }
+  fillInDTypeGivenDTypeAndDataType(knowledge, dtype, type);
+  return getLatticeElement(op.getResult()).join(knowledge);
+}
+
+ChangeResult TypeAnalyzer::visitLinalgInitTensorOp(LinalgInitTensorOp op) {
+  auto knowledge =
+      ValueKnowledge::getNotNonePessimisticValueState(op.getContext());
+  Value sizes = op.sizes();
+  Value dtype = op.dtype();
+  Type type = sizes.getType();
+
+  SmallVector<Value> sizesValues;
+  if (!getListConstructElements(sizes, sizesValues))
+    return getLatticeElement(op.getResult()).join(knowledge);
+
+  if (sizesValues.size() != 0)
+    knowledge.hasSizes = true;
+
+  for (Value sizeValue : sizesValues) {
+    int64_t size;
+    if (matchPattern(sizeValue, m_TorchConstantInt(&size)))
+      knowledge.sizes.push_back(size);
+    else
+      knowledge.sizes.push_back(kUnknownSize);
+  }
+
   fillInDTypeGivenDTypeAndDataType(knowledge, dtype, type);
   return getLatticeElement(op.getResult()).join(knowledge);
 }
