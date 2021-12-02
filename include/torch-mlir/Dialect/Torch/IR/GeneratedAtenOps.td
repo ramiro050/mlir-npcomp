@@ -3076,3 +3076,19 @@ def Torch_LinalgInitTensorOp : Torch_Op<"linalg.init_tensor", [
   );
   let assemblyFormat = "$sizes `,` $dtype attr-dict `:` type($sizes) `,` type($dtype) `->` type($result)";
 }
+
+def Torch_LinalgMatmulOp : Torch_Op<"linalg.matmul", [
+    AllowsTypeRefinement,
+    HasValueSemantics
+  ]> {
+  let summary = "Generated op for `linalg::matmul : (Tensor, Tensor, Tensor) -> (Tensor)`";
+  let arguments = (ins
+    AnyTorchTensorType:$self,
+    AnyTorchTensorType:$other,
+    AnyTorchTensorType:$out
+  );
+  let results = (outs
+    AnyTorchTensorType:$result
+  );
+  let assemblyFormat = "$self `,` $other `,` $out attr-dict `:` type($self) `,` type($other) `,` type($out) `->` type($result)";
+}
