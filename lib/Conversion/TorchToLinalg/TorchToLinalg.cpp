@@ -3165,6 +3165,31 @@ public:
 };
 } // namespace
 
+namespace {
+class ConvertLinalgMatmulOp
+    : public OpConversionPattern<LinalgMatmulOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(LinalgMatmulOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (failed(verifyLinalgCompatibleTypes(op, rewriter)))
+      return failure();
+
+    Location loc = op.getLoc();
+    auto resultType =
+      getTypeConverter()->convertType(op.getType()).cast<RankedTensorType>();
+
+    Value matmul = rewriter.create<linalg::MatmulOp>(
+        loc, adaptor.out().getType(), ValueRange{adaptor.self(), adaptor.other()},
+        adaptor.out()).getResult(0);
+
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(op, resultType, matmul);
+    return success();
+  }
+};
+} // namespace
+
 // -----------------------------------------------------------------------------
 // The pass
 // -----------------------------------------------------------------------------
@@ -3260,6 +3285,8 @@ public:
     patterns.add<ConvertAtenFill_ScalarOp>(typeConverter, context);
     target.addIllegalOp<LinalgInitTensorOp>();
     patterns.add<ConvertLinalgInitTensorOp>(typeConverter, context);
+    target.addIllegalOp<LinalgMatmulOp>();
+    patterns.add<ConvertLinalgMatmulOp>(typeConverter, context);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))
