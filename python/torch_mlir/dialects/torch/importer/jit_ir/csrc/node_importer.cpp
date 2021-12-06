@@ -96,6 +96,21 @@ void NodeImporter::importNode(Node *node, MlirBlock appendToBlock) {
     mapResults(node, operation);
   };
 
+  // TODO(ramiro050): This needs some changes to deal with the case where the
+  // PythonOp does not actually correspond to a linalg op. A possible way of
+  // doing this is by having the PythonOp name include the namespace,
+  // such as linalg_init_tensor, rather than just init_tensor.
+  if (kind == at::prim::PythonOp) {
+    auto* pyOp = static_cast<const ::torch::jit::PythonOp*>(node);
+    std::string opNameSuffix = "linalg." + pyOp->name();
+    MlirOperation operation =
+        createOperationFromOpNameSuffix(appendToBlock, loc, std::move(opNameSuffix),
+                                        getMlirTypesFromValues(loc, node->outputs()),
+                                        lookupMappedValues(node->inputs()));
+    mapResults(node, operation);
+    return;
+  }
+
   // Trivial ops with schema.
   auto maybeSchema = node->maybeSchema();
   if (maybeSchema) {

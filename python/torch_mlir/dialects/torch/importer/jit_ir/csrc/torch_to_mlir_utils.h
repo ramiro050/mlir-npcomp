@@ -76,6 +76,12 @@ MlirOperation createOperationFromSchema(MlirBlock appendToBlock,
                                         c10::ArrayRef<MlirType> resultTypes,
                                         c10::ArrayRef<MlirValue> operands);
 
+MlirOperation createOperationFromOpNameSuffix(MlirBlock appendToBlock,
+                                              MlirLocation loc,
+                                              std::string opNameSuffix,
+                                              c10::ArrayRef<MlirType> resultTypes,
+                                              c10::ArrayRef<MlirValue> operands);
+
 } // namespace torch_mlir
 
 #endif // TORCHMLIRJITIRIMPORTER_CSRC_TORCH_TO_MLIR_UTILS_H

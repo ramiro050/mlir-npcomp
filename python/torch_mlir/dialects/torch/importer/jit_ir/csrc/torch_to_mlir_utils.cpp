@@ -392,8 +392,6 @@ torch_mlir::createOperationFromSchema(MlirBlock appendToBlock, MlirLocation loc,
                                       const c10::FunctionSchema &schema,
                                       c10::ArrayRef<MlirType> resultTypes,
                                       c10::ArrayRef<MlirValue> operands) {
-  MlirContext context = mlirLocationGetContext(loc);
-
   // Munge the name into the appropriate MLIR operation name.
   // See torch_ods_gen.py:JitOperator for the logic used to construct the MLIR
   // op name from the schema. This logic must be kept in sync with that logic.
@@ -405,6 +403,19 @@ torch_mlir::createOperationFromSchema(MlirBlock appendToBlock, MlirLocation loc,
   if (!overloadName.empty()) {
     opNameSuffix = opNameSuffix + "." + overloadName;
   }
+
+  return createOperationFromOpNameSuffix(appendToBlock, loc,
+                                         std::move(opNameSuffix),
+                                         resultTypes,
+                                         operands);
+}
+
+MlirOperation
+torch_mlir::createOperationFromOpNameSuffix(MlirBlock appendToBlock, MlirLocation loc,
+                                            std::string opNameSuffix,
+                                            c10::ArrayRef<MlirType> resultTypes,
+                                            c10::ArrayRef<MlirValue> operands) {
+  MlirContext context = mlirLocationGetContext(loc);
   std::string opName = "torch." + opNameSuffix;
   // If we have a registered op, use it!
   if (mlirContextIsRegisteredOperation(context, toMlirStringRef(opName))) {
