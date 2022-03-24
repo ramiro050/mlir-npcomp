@@ -294,3 +294,26 @@ class IndexPut1DIntAccumulateModule(torch.nn.Module):
 def IndexPut1DIntAccumulateModule_basic(module, tu: TestUtils):
   module.forward(torch.randint(100, (10,)), torch.randint(10, (10,)),
                  torch.randint(1000, (10,)))
+
+# ==============================================================================
+
+class IndexPutHackedTwinOneDimFloatNonAccumulateModule(torch.nn.Module):
+
+  def __init__(self):
+    super().__init__()
+
+  @export
+  @annotate_args([
+      None,
+      ([-1], torch.float32, True),
+      ([-1], torch.int64, True),
+      ([-1], torch.float32, True),
+  ])
+  def forward(self, input, index, value):
+    return torch.ops.aten.index_put.hacked_twin(input, [index], value, accumulate=False)
+
+
+@register_test_case(module_factory=lambda: IndexPutHackedTwinOneDimFloatNonAccumulateModule())
+def IndexPutHackedTwinOneDimFloatNonAccumulateModule_basic(module, tu: TestUtils):
+  module.forward(tu.rand(100), torch.randint(100, (250,)),
+                 tu.rand(250))
