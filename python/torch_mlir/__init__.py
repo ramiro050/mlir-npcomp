@@ -320,6 +320,7 @@ def compile(model: torch.nn.Module,
             ignore_traced_shapes=False,
             backend_legal_ops: Optional[Sequence[str]] = None,
             extra_library: Iterable[Callable] = [],
+            use_external_references_if_numel_exceeds: Optional[int] = None,
             verbose: bool = False,
             use_make_fx: bool = False):
     """Convert a PyTorch model to MLIR.
@@ -350,6 +351,10 @@ def compile(model: torch.nn.Module,
             into the abstract interpretation library. See
             `docs/adding_abstract_interpretation_functions.md` for more info
             on the format the functions should have.
+        use_external_references_if_numel_exceeds: If non-None, then any tensors
+            with more than this number of elements will be referenced in the
+            IR with an external reference. This is useful for gigantic models
+            where materializing the weights in the IR is impractical.
         verbose: If true, print extra information about the conversion.
 
     Returns:
@@ -430,6 +435,7 @@ def compile(model: torch.nn.Module,
     mb = ModuleBuilder()
     import_options = ImportOptions()
     import_options.ignoreExistingTensorShapesAndDtypes = ignore_traced_shapes
+    import_options.useExternalReferencesIfNumelExceeds = use_external_references_if_numel_exceeds
     try:
         original_stderr = sys.stderr
         sys.stderr = StringIO()
