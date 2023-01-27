@@ -195,6 +195,8 @@ class SimplifyDtypeCalculationsPass
     patterns.insert<DecomposePromoteDtypesOp>(context);
     patterns.insert<RefineNumToTensorScalarOpType>(context);
 
+    PrimIfOp::getCanonicalizationPatterns(patterns, context);
+
     // TODO: Debug visitation order to make this more efficient.
     // A single linear scan should suffice.
     GreedyRewriteConfig config;
