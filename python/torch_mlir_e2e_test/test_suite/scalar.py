@@ -35,6 +35,29 @@ def AddIntModule_basic(module, tu: TestUtils):
 # ==============================================================================
 
 
+class AddFloatModule(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    @export
+    @annotate_args([
+        None,
+        ([], torch.float32, True),
+        ([], torch.float32, True),
+    ])
+    def forward(self, lhs, rhs):
+        return float(torch.ops.aten.add(float(lhs), float(rhs)))
+
+
+@register_test_case(module_factory=lambda: AddFloatModule())
+def AddFloatModule_basic(module, tu: TestUtils):
+    module.forward(tu.rand(), tu.rand())
+
+
+# ==============================================================================
+
+
 class SubIntModule(torch.nn.Module):
 
     def __init__(self):

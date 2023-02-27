@@ -59,10 +59,14 @@ def _refbackend_torchdynamo_backend(fx_graph: torch.fx.GraphModule,
     def compiled_callable(*inputs):
         inputs = [x.numpy() for x in inputs]
         result = loaded.forward(*inputs)
-        if not isinstance(result, tuple):
-            result = torch.from_numpy(result)
-        else:
+        if isinstance(result, tuple):
             result = tuple(torch.from_numpy(x) for x in result)
+        elif isinstance(result, torch.Tensor):
+            result = torch.from_numpy(result)
+        elif isinstance(result, (bool, int, float)):
+            pass
+        else:
+            raise ValueError(f"Unhandled return type {type(result)}")
         return result
     return compiled_callable
 
