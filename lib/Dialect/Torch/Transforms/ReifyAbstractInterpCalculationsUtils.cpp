@@ -167,12 +167,14 @@ FailureOr<Value> Torch::adjustFunctionArg(
     return b.create<DerefineOp>(loc, desiredType, operand).getResult();
   }
 
-  // !torch.union<int, float> is the type used for `Scalar` inputs. At
-  // compile time, such inputs will usually be resolved to an `int` or a `float`
-  // so we need to derefine to match the library function signature.
+  // !torch.union<int, float> or !torch.union<int, float, none> is the type used
+  // for (optional) `Scalar` inputs. At compile time, such inputs will usually
+  // be resolved to an `int` or a `float` so we need to derefine to match the
+  // library function signature.
   if (auto unionType = desiredType.dyn_cast<Torch::UnionType>()) {
     if (llvm::all_of(unionType.getContainedTypes(), [](Type containedType) {
-          return containedType.isa<Torch::IntType, Torch::FloatType>();
+          return containedType
+              .isa<Torch::IntType, Torch::FloatType, Torch::NoneType>();
         }))
       return b.create<DerefineOp>(loc, desiredType, operand).getResult();
   }
@@ -180,9 +182,19 @@ FailureOr<Value> Torch::adjustFunctionArg(
   // If the operand is NoneType, then we just need to derefine it to the
   // optional type in the function signature.
   if (operandType.isa<Torch::NoneType>()) {
-    assert(desiredType.isa<Torch::OptionalType>() &&
+    assert(!desiredType.isa<Torch::NoneType>() &&
            "Don't expect library functions to have NoneType parameters");
     return b.create<DerefineOp>(loc, desiredType, operand).getResult();
+  }
+
+  // To keep things simple in shape functions, `Scalar` inputs are considered
+  // `float`s. This is safe since output shape of torch ops never depends on the
+  // dtype of input scalars. However, this also means we sometimes have to
+  // manually turn `Scalar`s into `float`s when inserting the shape functions
+  // into the IR.
+  if (operandType.isa<Torch::NumberType>() &&
+      desiredType.isa<Torch::FloatType>()) {
+    return b.create<AtenFloatScalarOp>(loc, desiredType, operand).getResult();
   }
 
   // If the operand type is statically !torch.optional, then we need to do
