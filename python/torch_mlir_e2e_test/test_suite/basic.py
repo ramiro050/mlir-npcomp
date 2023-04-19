@@ -3723,3 +3723,38 @@ class ConstantBoolParameterModule(torch.nn.Module):
 @register_test_case(module_factory=lambda: ConstantBoolParameterModule())
 def ConstantBoolParameterModule_basic(module, tu: TestUtils):
     module.forward()
+class AtenComplexImagModule(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        ([-1,-1], torch.float32, True),
+    ])
+    def forward(self, x):
+        x = torch.view_as_complex(x)
+        return x.imag
+
+
+@register_test_case(module_factory=lambda: AtenComplexImagModule())
+def AtenComplexImagModule_basic(module, tu: TestUtils):
+    module.forward(tu.rand(5,2))
+
+class AtenComplexRealModule(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    @export
+    @annotate_args([
+        None,
+        ([-1,-1], torch.float32, True),
+    ])
+    def forward(self, x):
+        x = torch.view_as_complex(x)
+        return x.real
+
+
+@register_test_case(module_factory=lambda: AtenComplexRealModule())
+def AtenComplexRealModule_basic(module, tu: TestUtils):
+    module.forward(tu.rand(5,2))
+
+# ==============================================================================
