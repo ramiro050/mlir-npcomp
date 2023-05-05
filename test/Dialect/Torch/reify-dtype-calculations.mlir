@@ -39,15 +39,16 @@ func.func @op_with_dtype_promotion(%arg0: !torch.vtensor, %arg1: !torch.vtensor)
 
 // -----
 
-// CHECK-LABEL:   func.func private @__torch_mlir_dtype_fn.aten.convolution(
+// CHECK-LABEL:   func.func private @__torch_mlir_dtype_fn.aten._convolution.deprecated(
 
 // CHECK-LABEL:   func.func @op_with_optional_tensor_arg$none(
 // CHECK:           %[[NONE:.*]] = torch.constant.none
 // CHECK:             %[[OPTIONAL_TUPLE:.*]] = torch.derefine %[[NONE]] : !torch.none to !torch.optional<tuple<int, int>>
-// CHECK:             {{.*}} = func.call @__torch_mlir_dtype_fn.aten.convolution({{.*}}, %[[OPTIONAL_TUPLE]], {{.*}}) : ({{.*}}, !torch.optional<tuple<int, int>>, {{.*}}) -> !torch.int
+// CHECK:             {{.*}} = func.call @__torch_mlir_dtype_fn.aten._convolution.deprecated({{.*}}, %[[OPTIONAL_TUPLE]], {{.*}}) : ({{.*}}, !torch.optional<tuple<int, int>>, {{.*}}) -> !torch.int
 func.func @op_with_optional_tensor_arg$none(%input: !torch.vtensor, %weight: !torch.vtensor, %stride: !torch.list<int>, %padding: !torch.list<int>, %dilation: !torch.list<int>, %transposed: !torch.bool, %output_padding: !torch.list<int>, %groups: !torch.int) -> !torch.vtensor {
   %bias_none = torch.constant.none
-  %0 = torch.aten.convolution %input, %weight, %bias_none, %stride, %padding, %dilation, %transposed, %output_padding, %groups : !torch.vtensor, !torch.vtensor, !torch.none, !torch.list<int>, !torch.list<int>, !torch.list<int>, !torch.bool, !torch.list<int>, !torch.int -> !torch.vtensor
+  %false = torch.constant.bool false
+  %0 = torch.aten._convolution.deprecated %input, %weight, %bias_none, %stride, %padding, %dilation, %transposed, %output_padding, %groups, %false, %false, %false : !torch.vtensor, !torch.vtensor, !torch.none, !torch.list<int>, !torch.list<int>, !torch.list<int>, !torch.bool, !torch.list<int>, !torch.int, !torch.bool, !torch.bool, !torch.bool -> !torch.vtensor
   return %0 : !torch.vtensor
 }
 

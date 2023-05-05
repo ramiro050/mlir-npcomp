@@ -18,6 +18,7 @@
 #include "torch-mlir/Dialect/Torch/Transforms/Passes.h"
 #include "torch-mlir/Dialect/Torch/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/ADT/StringSet.h"
 
 #define DEBUG_TYPE "torch-lower-to-backend-contract"
 
@@ -31,7 +32,7 @@ using namespace mlir::torch::Torch;
 
 static void markDecomposedOpsAsIllegal(MLIRContext *context,
                                        ConversionTarget &target,
-                                       ArrayRef<std::string> backendLegalOps);
+                                       llvm::StringSet<> backendLegalOps);
 
 static LogicalResult checkType(Operation *op, Type type,
                                bool actuallyEmitDiagnostics) {
@@ -197,6 +198,24 @@ static bool satisfiesBackendContract(ModuleOp module,
   if (walkResult0.wasInterrupted())
     return false;
 
+  // Check for unimplemented operators first to give more direct diagnostics.
+  walkResult0 = module.walk([&](Torch::OperatorOp op) {
+    if (llvm::all_of(op.getResults(), [&op](auto res) {
+          return succeeded(
+              checkType(op.getOperation(), res.getType(), /*actuallyEmitDiagnostics=*/false));
+        })) {
+      return WalkResult::advance();
+    }
+
+    if (actuallyEmitDiagnostics) {
+      op->emitError("unsupported by backend contract: Unimplemented operator '"
+        + op.getName() + "'");
+    }
+    return WalkResult::interrupt();
+  });
+  if (walkResult0.wasInterrupted())
+    return false;
+
   // Check all the types of all Value's in the program and the legality of all
   // the ops.
   //
@@ -228,11 +247,11 @@ static bool satisfiesBackendContract(ModuleOp module,
 // Explicitly set ops and dialects allowed and not allowed in backend contract.
 static ConversionTarget
 getBackendContractTarget(MLIRContext *context, bool decompose,
-                         ArrayRef<std::string> backendLegalOps) {
+                         llvm::StringSet<> backendLegalOpsSet) {
   ConversionTarget target(*context);
   target.addLegalDialect<func::FuncDialect, Torch::TorchDialect>();
   if (decompose)
-    markDecomposedOpsAsIllegal(context, target, backendLegalOps);
+    markDecomposedOpsAsIllegal(context, target, backendLegalOpsSet);
   return target;
 }
 
@@ -242,21 +261,27 @@ class LowerToBackendContractPass
 public:
   LowerToBackendContractPass() = default;
   LowerToBackendContractPass(int maxIterations, bool decompose,
-                             ArrayRef<std::string> backendLegalOps) {
+                             ArrayRef<std::string> backendLegalOps,
+                             StringRef extraLibrary) {
     this->maxIterations = maxIterations;
     this->decompose = decompose;
     this->backendLegalOps = backendLegalOps;
+    this->extraLibrary = extraLibrary.str();
   }
   void runOnOperation() override {
     ModuleOp module = getOperation();
     MLIRContext *context = &getContext();
+
+    backendLegalOpsSet.clear();
+    backendLegalOpsSet.insert(backendLegalOps.begin(), backendLegalOps.end());
     ConversionTarget target =
-        getBackendContractTarget(context, decompose, backendLegalOps);
+        getBackendContractTarget(context, decompose, backendLegalOpsSet);
 
     OpPassManager pm(module.getOperationName());
     TorchLoweringPipelineOptions options;
     options.decompose = decompose;
     options.backendLegalOps = backendLegalOps;
+    options.extraLibrary = extraLibrary;
     createTorchSimplificationPipeline(pm, options);
 
     int i = 0;
@@ -283,6 +308,8 @@ public:
                    << " iterations of the simplification pipeline\n";
     });
   }
+private:
+  llvm::StringSet<> backendLegalOpsSet;
 };
 
 class VerifyBackendContractNoDecompositionsPass
@@ -294,7 +321,7 @@ public:
     MLIRContext *context = &getContext();
     ConversionTarget target =
         getBackendContractTarget(context, /*decompose*/false,
-                                 /*backendLegalOps*/{});
+                                 /*backendLegalOpsSet*/{});
 
     if (!satisfiesBackendContract(getOperation(), target,
                                   /*actuallyEmitDiagnostics=*/true)) {
@@ -306,9 +333,10 @@ public:
 
 std::unique_ptr<OperationPass<ModuleOp>>
 mlir::torch::Torch::createLowerToBackendContractPass(
-    int maxIterations, bool decompose, ArrayRef<std::string> backendLegalOps) {
-  return std::make_unique<LowerToBackendContractPass>(maxIterations, decompose,
-                                                      backendLegalOps);
+    int maxIterations, bool decompose, ArrayRef<std::string> backendLegalOps,
+    StringRef extraLibrary) {
+  return std::make_unique<LowerToBackendContractPass>(
+      maxIterations, decompose, backendLegalOps, extraLibrary);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -319,9 +347,9 @@ mlir::torch::Torch::createVerifyBackendContractNoDecompositionsPass() {
 // The backend contract guarantees that ops with decompositions available will
 // be decomposed. The only way to have an op reach the backend contract without
 // getting decomposed is by having the user explicitly specify that op in the
-// `backendLegalOps` argument to the `LowerToBackendContractPass`. Therefore,
+// `backendLegalOpsSet` argument to the `LowerToBackendContractPass`. Therefore,
 // here we mark as illegal all ops with decompositions except for those in
-// `backendLegalOps`.
+// `backendLegalOpsSet`.
 //
 // The legality check takes place here instead of in the `DecomposeComplexOps`
 // pass for two reasons:
@@ -334,7 +362,7 @@ mlir::torch::Torch::createVerifyBackendContractNoDecompositionsPass() {
 //   decompositions explicit in this file
 static void markDecomposedOpsAsIllegal(MLIRContext *context,
                                        ConversionTarget &target,
-                                       ArrayRef<std::string> backendLegalOps) {
+                                       llvm::StringSet<> backendLegalOpsSet) {
   target.addIllegalOp<AtenSoftmaxIntOp>();
   target.addIllegalOp<Aten_SoftmaxOp>();
   target.addIllegalOp<Aten_LogSoftmaxOp>();
@@ -351,7 +379,6 @@ static void markDecomposedOpsAsIllegal(MLIRContext *context,
   target.addIllegalOp<AtenWhereScalarOtherOp>();
   target.addIllegalOp<AtenWhereScalarSelfOp>();
   target.addIllegalOp<AtenMaskedFillScalarOp>();
-  target.addIllegalOp<AtenConvolutionBackwardOverrideableOp>();
   target.addIllegalOp<AtenSizeOp>();
   target.addIllegalOp<AtenReshapeOp>();
   target.addIllegalOp<Aten_SoftmaxBackwardDataOp>();
@@ -377,7 +404,6 @@ static void markDecomposedOpsAsIllegal(MLIRContext *context,
   target.addIllegalOp<AtenLayerNormOp>();
   target.addIllegalOp<AtenNativeLayerNormOp>();
   target.addIllegalOp<AtenNativeBatchNormOp>();
-  target.addIllegalOp<AtenConvolutionOverrideableOp>();
   target.addIllegalOp<Aten_ConvolutionOp, Aten_ConvolutionDeprecatedOp>();
   target.addIllegalOp<AtenConvolutionBackwardOp>();
   target.addIllegalOp<AtenConv2dOp>();
@@ -435,6 +461,7 @@ static void markDecomposedOpsAsIllegal(MLIRContext *context,
   target.addIllegalOp<AtenIndexTensorHackedTwinOp>();
   target.addIllegalOp<AtenMseLossOp>();
   target.addIllegalOp<AtenRandintLowOp>();
+  target.addIllegalOp<AtenRandintOp>();
   target.addIllegalOp<AtenVarMeanCorrectionOp>();
   target.addIllegalOp<PrimsConvertElementTypeOp>();
   target.addIllegalOp<PrimsVarOp>();
@@ -445,7 +472,19 @@ static void markDecomposedOpsAsIllegal(MLIRContext *context,
   target.addIllegalOp<AtenVarMeanOp>();
   target.addIllegalOp<AtenNewEmptyStridedOp>();
   target.addIllegalOp<AtenBucketizeTensorOp>();
-  for (std::string opName : backendLegalOps) {
-    target.addLegalOp(OperationName(opName, context));
+  target.addIllegalOp<PrimsSqueezeOp>();
+  target.addIllegalOp<AtenMovedimIntOp>();
+  target.addIllegalOp<AtenOneHotOp>();
+  target.addIllegalOp<AtenCrossEntropyLossOp>();
+  target.addIllegalOp<AtenVarMeanDimOp>();
+  target.addIllegalOp<AtenTopkOp>();
+  for (auto &opName : backendLegalOpsSet) {
+    target.addLegalOp(
+        OperationName(kTorchOpPrefix + opName.first().str(), context));
   }
+  target.addDynamicallyLegalOp<OperatorOp>(
+      [backendLegalOpsSet](OperatorOp opOp) {
+        auto opName = opOp->getAttr("name").cast<StringAttr>().getValue();
+        return backendLegalOpsSet.contains(opName);
+      });
 }

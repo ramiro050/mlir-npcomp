@@ -33,31 +33,6 @@ using namespace mlir;
 using namespace mlir::torch;
 using namespace mlir::torch::Torch;
 
-static Value toPositiveValidDim(ConversionPatternRewriter &rewriter,
-                                Location loc, Value torchOptionalInt,
-                                Value builtinInt, Value defaultValue,
-                                Value dimSize) {
-  if (torchOptionalInt.getType().isa<Torch::NoneType>())
-    return defaultValue;
-  auto dimSizeAsInt = castIndexToInt64(rewriter, loc, dimSize);
-  Value positiveDim =
-      toPositiveDimDynamic(rewriter, loc, builtinInt, dimSizeAsInt);
-  // positveDim < 0 ? 0 : positiveDim
-  Value cst0 = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(dimSizeAsInt.getType()));
-  Value predDimSltZero = rewriter.create<arith::CmpIOp>(
-      loc, arith::CmpIPredicate::slt, positiveDim, cst0);
-  Value atLeastZero =
-      rewriter.create<arith::SelectOp>(loc, predDimSltZero, cst0, positiveDim);
-  // atLeastZero > dimSizeAsInt ? dimSizeAsInt : atLeastZero
-  Value sgtDimSize = rewriter.create<arith::CmpIOp>(
-      loc, arith::CmpIPredicate::sgt, atLeastZero, dimSizeAsInt);
-  Value boundedByDimSize = rewriter.create<arith::SelectOp>(
-      loc, sgtDimSize, dimSizeAsInt, atLeastZero);
-
-  return castIntToIndex(rewriter, loc, boundedByDimSize);
-}
-
 template <typename OpTy, typename OpAdaptor>
 LogicalResult prepareArgumentsForSlicingOp(OpTy op, OpAdaptor adaptor,
                                            ConversionPatternRewriter &rewriter,
@@ -145,6 +120,13 @@ public:
       return rewriter.notifyMatchFailure(op, "end_dim must be constant");
     auto type = adaptor.getSelf().getType().cast<RankedTensorType>();
     auto inputRank = type.getRank();
+    if (inputRank == 1) {
+      // If input rank is equal to 1, then there's no scope for flattening the
+      // input tensor.
+      rewriter.replaceOp(op, adaptor.getSelf());
+      return success();
+    }
+
     auto resultType =
         getTypeConverter()->convertType(op.getType()).cast<RankedTensorType>();
     if (startDim < 0)
@@ -874,10 +856,9 @@ public:
       return rewriter.notifyMatchFailure(op, "dim must be constant");
     auto inputRank =
         adaptor.getSelf().getType().cast<RankedTensorType>().getRank();
-    if (dim < 0)
-      dim += inputRank + 1;
-    if (!(0 <= dim && dim <= inputRank))
-      return rewriter.notifyMatchFailure(op, "statically invalid");
+    dim = toPositiveDim(dim, inputRank + 1);
+    if (!isValidDim(dim, inputRank + 1))
+      return rewriter.notifyMatchFailure(op, "dim is statically invalid");
 
     SmallVector<ReassociationIndices> reassociationMap(inputRank);
     // From the perspective of the reassociation map, the situation of
@@ -1101,11 +1082,6 @@ public:
     Location loc = op.getLoc();
     TypeConverter *typeConverter = getTypeConverter();
 
-    Value dimValue = op.getDim();
-    int64_t dim;
-    if (!matchPattern(dimValue, m_TorchConstantInt(&dim)))
-      return op.emitError("unimplemented: dim is not constant");
-
     // Collect all the tensors to be concatenated.
     auto tensorList = op.getTensors();
     SmallVector<Value> tensorsTorchType;
@@ -1130,6 +1106,14 @@ public:
     }
 
     int rank = newResultType.getRank();
+    Value dimValue = op.getDim();
+    int64_t dim;
+    if (!matchPattern(dimValue, m_TorchConstantInt(&dim)))
+      return op.emitError("unimplemented: dim is not constant");
+    dim = toPositiveDim(dim, rank);
+    if (!isValidDim(dim, rank))
+      return rewriter.notifyMatchFailure(op, "dim is statically invalid");
+      
     SmallVector<Value> offsets, sizes, strides;
     sizes.reserve(rank);
     strides.resize(rank, rewriter.create<arith::ConstantIndexOp>(loc, 1));
@@ -1137,10 +1121,6 @@ public:
 
     for (int i = 0; i < rank; ++i)
       sizes.push_back(rewriter.createOrFold<tensor::DimOp>(loc, tensors[0], i));
-
-    dim = toPositiveDim(dim, rank);
-    if (!isValidDim(dim, rank))
-      return rewriter.notifyMatchFailure(op, "dim is statically invalid");
 
     // Calculate the size of the `dim` result dimension by adding the dim size
     // of each tensor together.
