@@ -799,40 +799,6 @@ def aten〇_convolution〡shape(input: List[int], weight: List[int], bias: Optio
 def aten〇_convolution〇deprecated〡shape(input: List[int], weight: List[int], bias: Optional[List[int]], stride: List[int], padding: List[int], dilation: List[int], transposed: bool, output_padding: List[int], groups: int, benchmark: bool, deterministic: bool, cudnn_enabled: bool) -> List[int]:
     return aten〇convolution〡shape(input, weight, bias, stride, padding, dilation, transposed, output_padding, groups)
 
-_convolution_deprecated_kwargs = {
-    "stride" : [1, 1], "padding" : [0, 0], "dilation" : [1, 1], "transposed" : False, "output_padding" : [0, 0],
-    "groups" : 1, "benchmark" : False, "deterministic" : False, "cudnn_enabled" : False}
-@check_dtype_function(
-    [Invocation(TensorOfShape(1, 1, 1, 1, dtype=torch.float32), TensorOfShape(1, 1, 1, 1, dtype=torch.float32), # Same type
-                TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.int32), TensorOfShape(1, 1, 1, 1, dtype=torch.float32), # Different type
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.bfloat16), TensorOfShape(1, 1, 1, 1, dtype=torch.float32), # Different width
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.bfloat16), TensorOfShape(1, 1, 1, 1, dtype=torch.int32), # Different type and width
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.complex64), TensorOfShape(1, 1, 1, 1, dtype=torch.float32),
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.float32), TensorOfShape(1, 1, 1, 1, dtype=torch.complex128),
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.bool), TensorOfShape(1, 1, 1, 1, dtype=torch.float32),
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.float32), TensorOfShape(1, 1, 1, 1, dtype=torch.bool),
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.float16), TensorOfShape(1, 1, 1, 1, dtype=torch.float32),
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs),
-     ErrorInvocation(TensorOfShape(1, 1, 1, 1, dtype=torch.float32), TensorOfShape(1, 1, 1, 1, dtype=torch.float16),
-                     TensorOfShape(1, dtype=torch.float32), **_convolution_deprecated_kwargs)
-])
-def aten〇_convolution〇deprecated〡dtype(input_rank_dtype: Tuple[int, int], weight_rank_dtype: Tuple[int, int], bias_rank_dtype: Optional[Tuple[int, int]], stride: List[int], padding: List[int], dilation: List[int], transposed: bool, output_padding: List[int], groups: int, benchmark: bool, deterministic: bool, cudnn_enabled: bool) -> int:
-    input_rank, input_dtype = input_rank_dtype
-    weight_rank, weight_dtype = weight_rank_dtype
-    assert input_dtype == weight_dtype
-    assert input_dtype not in [torch.bool, torch.float16, torch.complex64, torch.complex128]
-    ranks: List[Optional[int]] = [input_rank, weight_rank]
-    dtypes = [input_dtype, weight_dtype]
-    return promote_dtypes(ranks, dtypes)
-
 def aten〇flip〡shape(self: List[int], dims: List[int]) -> List[int]:
     return self
 
