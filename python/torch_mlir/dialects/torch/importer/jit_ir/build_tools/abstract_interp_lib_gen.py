@@ -2986,6 +2986,13 @@ def aten〇atan2〡dtype(self_rank_dtype: Tuple[int, int], other_rank_dtype: Tup
         return torch.float32
     return promoted_dtype
 
+@check_dtype_function(_check_tensors_with_the_same_dtype(num_of_tensors=1))
+def aten〇atan〡dtype(self_rank_dtype: Tuple[int, int]) -> int:
+    self_rank, self_dtype = self_rank_dtype
+    if is_integer_dtype(self_dtype):
+        return torch.float32
+    return self_dtype
+
 @check_dtype_function(_check_two_tensor_op())
 def aten〇linear〡dtype(input_rank_dtype: Tuple[int, int], weight_rank_dtype: Tuple[int, int], bias_rank_dtype: Optional[Tuple[int, int]] = None) -> int:
     input_rank, input_dtype = input_rank_dtype
@@ -3087,6 +3094,11 @@ def aten〇bucketize〇Tensor〡dtype(self_rank_dtype: Tuple[int, int], boundari
     if out_int32:
         return torch.int32
     return torch.int64
+
+@check_dtype_function(_check_tensors_with_the_same_dtype(num_of_tensors=1, dimensions=[]))
+def prims〇squeeze〡dtype(a_rank_dtype: Tuple[int, int], dimensions: List[int]) -> int:
+    a_rank, a_dtype = a_rank_dtype
+    return a_dtype
 
 # ==============================================================================
 # Main
