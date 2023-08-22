@@ -986,6 +986,7 @@ def Torch_ExternalNonValueTensorLiteralOp : Torch_Op<"tensor.external.literal", 
 
 def Torch_ExternalValueTensorLiteralOp : Torch_Op<"vtensor.external.literal", [
     AllowsTypeRefinement,
+    Pure
   ]> {
   let summary = "Create a value of !torch.vtensor type from an external literal";
   let description = [{
