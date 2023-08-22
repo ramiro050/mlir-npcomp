@@ -208,6 +208,16 @@ static Value createInitElementForReduceOp(OpBuilder &b, Location loc,
   if (isa<AtenSumOp, AtenSumDimIntListOp>(op))
     return b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
 
+  if (isa<AtenProdDimIntOp>(op)) {
+    if (elementType.isa<mlir::FloatType>()) {
+      return b.create<arith::ConstantOp>(loc, b.getFloatAttr(elementType, 1.0));
+    } else if (elementType.isa<mlir::IntegerType>()) {
+      return b.create<arith::ConstantOp>(loc, b.getIntegerAttr(elementType, 1));
+    } else {
+      assert(false && "TODO");
+    }
+  }
+
   if (isa<AtenMaxOp>(op)) {
     if (elementType.isa<mlir::FloatType>())
       return b.create<arith::ConstantOp>(
@@ -244,6 +254,14 @@ static Value createLinalgPayloadForReduceOp(OpBuilder &b, Location loc,
       return b.create<arith::AddFOp>(loc, self, result);
     else if (resultElementType.isa<mlir::IntegerType>())
       return b.create<arith::AddIOp>(loc, self, result);
+  } else if (isa<AtenProdDimIntOp>(op)) {
+    Value self =
+        convertScalarToDtype(b, loc, payloadArgs[0], resultElementType);
+    Value result = payloadArgs[1];
+    if (resultElementType.isa<mlir::FloatType>())
+      return b.create<arith::MulFOp>(loc, self, result);
+    else if (resultElementType.isa<mlir::IntegerType>())
+      return b.create<arith::MulIOp>(loc, self, result);
   } else if (auto max = dyn_cast<AtenMaxOp>(op)) {
     Value self =
         convertScalarToDtype(b, loc, payloadArgs[0], resultElementType);
@@ -307,6 +325,7 @@ private:
                                          "`keepdim` must be a constant bool");
 
     SmallVector<int64_t> dimList;
+    int64_t dimInt;
     bool isNoneOrEmptyDimList =
         op.getDim().getType().template isa<Torch::NoneType>();
     if (matchPattern(op.getDim(), m_TorchListOfConstantInts(dimList))) {
@@ -319,6 +338,11 @@ private:
       }
       if (dimList.empty())
         isNoneOrEmptyDimList = true;
+    } else if (matchPattern(op.getDim(), m_TorchConstantInt(&dimInt))) {
+      dimInt = toPositiveDim(dimInt, inputType.getRank());
+      if (!isValidDim(dimInt, inputType.getRank()))
+        return rewriter.notifyMatchFailure(op, "TODO");
+      opInfo.dimSet.insert(dimInt);
     } else if (!isNoneOrEmptyDimList) {
       return rewriter.notifyMatchFailure(
           op, "`dim` argument must be a constant int list or None");
@@ -354,6 +378,9 @@ private:
 
     if (auto sumOp = dyn_cast<AtenSumDimIntListOp>(op))
       return computeReductionOpInfoForDimVariantOp(sumOp, operands, rewriter);
+
+    if (auto prodOp = dyn_cast<AtenProdDimIntOp>(op))
+      return computeReductionOpInfoForDimVariantOp(prodOp, operands, rewriter);
 
     if (auto normOp = dyn_cast<AtenLinalgVectorNormOp>(op))
       return computeReductionOpInfoForDimVariantOp(normOp, operands, rewriter);
@@ -522,5 +549,6 @@ void mlir::torch::torch_to_linalg::populateReductionPatternsAndLegality(
   target.addIllegalOp<AtenMaxOp>();
   target.addIllegalOp<AtenLinalgVectorNormOp>();
   target.addIllegalOp<AtenFrobeniusNormDimOp>();
+  target.addIllegalOp<AtenProdDimIntOp>();
   patterns.add<ConvertReductionOp>(typeConverter, context);
 }

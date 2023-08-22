@@ -3742,6 +3742,32 @@ def Torch_AtenViewAsComplexOp : Torch_Op<"aten.view_as_complex", [
   }];
 }
 
+def Torch_AtenProdDimIntOp : Torch_Op<"aten.prod.dim_int", [
+    AllowsTypeRefinement,
+    HasValueSemantics,
+    ReadOnly
+  ]> {
+  let summary = "Generated op for `aten::prod.dim_int : (Tensor, int, bool, int?) -> (Tensor)`";
+  let arguments = (ins
+    AnyTorchTensorType:$self,
+    Torch_IntType:$dim,
+    Torch_BoolType:$keepdim,
+    AnyTorchOptionalIntType:$dtype
+  );
+  let results = (outs
+    AnyTorchTensorType:$result
+  );
+  let hasCustomAssemblyFormat = 1;
+  let extraClassDefinition = [{
+    ParseResult AtenProdDimIntOp::parse(OpAsmParser &parser, OperationState &result) {
+      return parseDefaultTorchOp(parser, result, 4, 1);
+    }
+    void AtenProdDimIntOp::print(OpAsmPrinter &printer) {
+      printDefaultTorchOp(printer, *this, 4, 1);
+    }
+  }];
+}
+
 def Torch_AtenUniformOp : Torch_Op<"aten.uniform", [
     AllowsTypeRefinement,
     HasValueSemantics,

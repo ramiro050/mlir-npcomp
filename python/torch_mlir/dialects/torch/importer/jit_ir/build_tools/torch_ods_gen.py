@@ -314,7 +314,7 @@ def emit_ops(emitter_td: TextEmitter, registry: Registry):
     emit_with_mutating_variants("aten::add.Scalar : (Tensor, Scalar, Scalar) -> (Tensor)", has_canonicalizer=True)
     emit_with_mutating_variants("aten::sub.Scalar : (Tensor, Scalar, Scalar) -> (Tensor)", has_canonicalizer=True)
     emit_with_mutating_variants("aten::mul.Scalar : (Tensor, Scalar) -> (Tensor)", has_canonicalizer=True)
-    
+
     emit_with_mutating_variants("aten::addcmul : (Tensor, Tensor, Tensor, Scalar) -> (Tensor)")
     emit_with_mutating_variants("aten::addcdiv : (Tensor, Tensor, Tensor, Scalar) -> (Tensor)")
     emit("aten::maximum : (Tensor, Tensor) -> (Tensor)")
@@ -332,6 +332,7 @@ def emit_ops(emitter_td: TextEmitter, registry: Registry):
     emit("aten::real : (Tensor) -> (Tensor)")
     emit("aten::imag : (Tensor) -> (Tensor)")
     emit("aten::view_as_complex : (Tensor) -> (Tensor)")
+    emit("aten::prod.dim_int : (Tensor, int, bool, int?) -> (Tensor)")
 
     # Random number generation
     emit_with_mutating_variants("aten::uniform : (Tensor, float, float, Generator?) -> (Tensor)")
