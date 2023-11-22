@@ -292,6 +292,17 @@ def ReifyDtypeCalculations : Pass<"torch-reify-dtype-calculations", "ModuleOp"> 
   }];
 }
 
+def PdlExample : Pass<"torch-pdl-example", "ModuleOp"> {
+  let summary = "PDL Example";
+  let constructor = [{
+    mlir::torch::Torch::createPdlExamplePass(/*pdlLibrary=*/"")
+  }];
+  let options = [
+    Option<"pdlLibrary", "pdl-library", "std::string", /*default=*/"",
+           "TODO: docstring">,
+  ];
+}
+
 def SimplifyDtypeCalculations : Pass<"torch-simplify-dtype-calculations", "func::FuncOp"> {
   let summary = "Simplify reified dtype calculations.";
   let constructor = "mlir::torch::Torch::createSimplifyDtypeCalculationsPass()";

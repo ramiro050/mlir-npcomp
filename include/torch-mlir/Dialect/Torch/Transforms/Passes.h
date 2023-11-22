@@ -115,6 +115,9 @@ createSimplifyShapeCalculationsPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createReifyDtypeCalculationsPass(StringRef extraLibrary);
 
+std::unique_ptr<OperationPass<ModuleOp>>
+createPdlExamplePass(StringRef pdlLibrary);
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSimplifyDtypeCalculationsPass();
 
