@@ -847,6 +847,7 @@ def Torch_OperatorOp : Torch_Op<"operator", [
   let assemblyFormat = [{
     $name `(` $operands `)` attr-dict `:` functional-type($operands, $results)
   }];
+  let hasCanonicalizer = 1;
 }
 
 def Torch_LinearParamsCreateOp : Torch_Op<"linear_params.create", [
@@ -1324,6 +1325,28 @@ def Torch_DtypeCalculateYieldDtypesOp : Torch_Op<"dtype.calculate.yield.dtypes",
   }];
 
   let hasVerifier = 1;
+}
+
+def Torch_AutogptqCastToUInt4Op: Torch_Op<"autogptq.cast_to_uint4", [
+    AllowsTypeRefinement,
+    HasValueSemantics,
+    ReadOnly
+  ]> {
+  let arguments = (ins
+    AnyTorchTensorType:$input
+  );
+  let results = (outs
+    AnyTorchTensorType:$result
+  );
+  let hasCustomAssemblyFormat = 1;
+  let extraClassDefinition = [{
+    ParseResult AutogptqCastToUInt4Op::parse(OpAsmParser &parser, OperationState &result) {
+      return parseDefaultTorchOp(parser, result, 1, 1);
+    }
+    void AutogptqCastToUInt4Op::print(OpAsmPrinter &printer) {
+      printDefaultTorchOp(printer, *this, 1, 1);
+    }
+  }];
 }
 
 #endif // TORCH_OPS

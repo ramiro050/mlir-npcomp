@@ -568,11 +568,13 @@ static Value createLinalgPayloadCalculationForElementwiseOp(
                      .cast<RankedTensorType>()
                      .getElementType();
     Type resultElementType = sub.getType().cast<BaseTensorType>().getDtype();
+    Type selfElementType = sub.getSelf().getType().cast<BaseTensorType>().getDtype();
+    Type otherElementType = sub.getOther().getType().cast<BaseTensorType>().getDtype();
     Value lhs = convertScalarToDtype(b, loc, payloadArgs[0], dtype,
-                                     /*srcOriginalDtype=*/std::nullopt,
+                                     /*srcOriginalDtype=*/selfElementType,
                                      /*dstOriginalDtype=*/resultElementType);
     Value rhs = convertScalarToDtype(b, loc, payloadArgs[1], dtype,
-                                     /*srcOriginalDtype=*/std::nullopt,
+                                     /*srcOriginalDtype=*/otherElementType,
                                      /*dstOriginalDtype=*/resultElementType);
     Value alpha = convertScalarToDtype(b, loc, adaptor.getAlpha(), dtype,
                                        /*srcOriginalDtype=*/std::nullopt,

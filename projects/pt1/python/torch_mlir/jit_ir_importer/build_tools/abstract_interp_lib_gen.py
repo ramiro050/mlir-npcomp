@@ -2671,6 +2671,10 @@ def aten〇mv〡dtype(self_rank_dtype: Tuple[int, int], vec_rank_dtype: Tuple[in
 def aten〇sub〇Tensor〡dtype(self_rank_dtype: Tuple[int, int], other_rank_dtype: Tuple[int, int], alpha: Union[int, float, complex] = 1) -> int:
     other_rank, other_dtype = other_rank_dtype
     self_rank, self_dtype = self_rank_dtype
+    if self_dtype == 30:
+        return torch.int8
+    if other_dtype == 30:
+        return torch.int8
     ranks: List[Optional[int]] = [self_rank, other_rank]
     dtypes = [self_dtype, other_dtype]
     return promote_dtypes(ranks, dtypes)
@@ -2959,6 +2963,8 @@ def aten〇addcdiv〡dtype(self_rank_dtype: Tuple[int, int], tensor1_rank_dtype:
                       _check_tensors_with_the_same_dtype(num_of_tensors=1, other=1.0))
 def aten〇add〇Scalar〡dtype(self_rank_dtype: Tuple[int, int], other: Union[int, float, complex], alpha: Union[int, float, complex] = 1) -> int:
     self_rank, self_dtype = self_rank_dtype
+    if self_dtype == 30:
+        return self_dtype
     ranks: List[Optional[int]] = [self_rank, None]
     dtypes = [self_dtype, get_dtype_of_scalar(other)]
     return promote_dtypes(ranks, dtypes)
@@ -3837,7 +3843,17 @@ def prims〇collapse〡dtype(a_rank_dtype: Tuple[int, int], start: int, end: int
     a_rank, a_dtype = a_rank_dtype
     return a_dtype
 
+@not_present_in_registry
+def autogptq〇cast_to_uint4〡dtype(input_rank_dtype: Tuple[int, int]) -> int:
+    return 30
 
+@not_present_in_registry
+def autogptq〇cast_to_uint4〡shape(input: List[int]) -> List[int]:
+    return input
+
+@not_present_in_registry
+def autogptq〇cast_to_uint4〡has_value_semantics() -> None:
+    return
 
 # ==============================================================================
 # Main

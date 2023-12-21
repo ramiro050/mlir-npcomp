@@ -2699,6 +2699,25 @@ void AtenCudaOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 }
 
 //===----------------------------------------------------------------------===//
+// AtenCudaOp
+//===----------------------------------------------------------------------===//
+
+void OperatorOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                             MLIRContext *context) {
+  patterns.add(+[](OperatorOp op, PatternRewriter &rewriter) {
+    if (op.getName().str() != "autogptq.cast_to_uint4") {
+      return failure();
+    }
+    Value none = rewriter.create<ConstantNoneOp>(op->getLoc());
+    Value cstFalse = rewriter.create<ConstantBoolOp>(op->getLoc(), false);
+    Value dtype = rewriter.create<ConstantIntOp>(op->getLoc(), rewriter.getI64IntegerAttr(30));
+    rewriter.replaceOpWithNewOp<AtenToDtypeOp>(op, op->getResult(0).getType(), op->getOperand(0), dtype,
+                                               /*non_blocking=*/cstFalse, /*copy=*/cstFalse, /*memory_format=*/none);
+    return success();
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // AtenDeviceWithIndexOp
 //===----------------------------------------------------------------------===//
 

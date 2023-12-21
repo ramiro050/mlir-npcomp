@@ -59,6 +59,8 @@ torch_upstream::ScalarType Torch::getScalarTypeForType(Type type) {
     return torch_upstream::ScalarType::BFloat16;
   if (type.isF16())
     return torch_upstream::ScalarType::Half;
+  if (type.isUnsignedInteger(4))
+    return static_cast<torch_upstream::ScalarType>(30);
   if (type.isUnsignedInteger(8))
     return torch_upstream::ScalarType::Byte;
   if (type.isSignedInteger(8))
@@ -88,6 +90,9 @@ Type Torch::getTypeForTorchType(
 FailureOr<Type>
 Torch::getTypeForScalarType(MLIRContext *context,
                             torch_upstream::ScalarType dtypeInt) {
+  if (static_cast<int>(dtypeInt) == 30) {
+    return IntegerType::get(context, 4, mlir::IntegerType::Unsigned);
+  }
   switch (dtypeInt) {
   case torch_upstream::ScalarType::Float:
     return Float32Type::get(context);
@@ -117,8 +122,10 @@ Torch::getTypeForScalarType(MLIRContext *context,
     return mlir::ComplexType::get(Float64Type::get(context));
   case torch_upstream::ScalarType::Undefined:
     return failure();
-  default:
+  default: {
+    printf("%d\n", (int)dtypeInt);
     llvm::report_fatal_error("unhandled type for getTypeForScalarType");
+  }
   }
 }
 
